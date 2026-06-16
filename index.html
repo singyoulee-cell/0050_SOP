@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>0050 動能防禦系統 (TWSE 官方直連版)</title>
+    <title>0050 動能防禦系統 (專業操盤版)</title>
     <style>
         :root {
             --bg-color: #f4f7f6;
@@ -36,6 +36,7 @@
             margin-bottom: 20px;
         }
         
+        /* 自動抓取主要按鈕 */
         .btn-auto {
             display: block; width: 100%; padding: 18px;
             background-color: var(--primary); color: white;
@@ -46,6 +47,7 @@
         }
         .btn-auto:hover { background-color: #334155; }
 
+        /* 手動輸入備用區塊 */
         .input-group {
             display: flex;
             flex-direction: column;
@@ -126,7 +128,7 @@
 <div class="container">
     <div class="header">
         <h1 style="margin-bottom: 5px;">🛡️ 0050/00631L 動能防禦系統</h1>
-        <p style="color: var(--text-muted); font-size: 1em; margin-top: 0;">TWSE 臺灣證交所直連版 | 13:20 決策專用</p>
+        <p style="color: var(--text-muted); font-size: 1em; margin-top: 0;">專業操盤版 | 13:20 決策專用</p>
     </div>
 
     <div class="card">
@@ -135,7 +137,7 @@
         </div>
 
         <button class="btn-auto" onclick="autoFetchAndCalculate()">
-            🔄 1. 向臺灣證交所(TWSE)自動抓取最新報價
+            🔄 1. 自動抓取最新盤中報價
         </button>
 
         <div class="input-group">
@@ -179,7 +181,7 @@
 <script>
     let globalHistoryData = null;
 
-    // 初始化背景載入歷史資料 (FinMind)
+    // 初始化時先背景載入歷史資料 (FinMind)
     async function loadHistoryData() {
         try {
             let d = new Date();
@@ -200,7 +202,7 @@
         }
     }
 
-    // 核心運算引擎
+    // 核心運算引擎 (帶入你給定的價格)
     function runCoreLogic(currentPrice) {
         if (!globalHistoryData) {
             alert("歷史資料尚未載入完成，請稍候重試。");
@@ -217,6 +219,7 @@
         
         let combinedData = [...globalHistoryData];
         
+        // 判斷是否需要把目前的價格當作新的一根 K棒塞進去
         if (lastHistoryDate !== todayStr) {
             combinedData.push({
                 close: currentPrice,
@@ -228,6 +231,7 @@
             combinedData[combinedData.length - 1].close = currentPrice;
         }
 
+        // 計算 20 EMA
         const emaPeriod = 20;
         const k = 2 / (emaPeriod + 1);
         let ema = [combinedData[0].close];
@@ -235,6 +239,7 @@
             ema.push(combinedData[i].close * k + ema[i-1] * (1 - k));
         }
 
+        // 計算 14 ATR
         const atrPeriod = 14;
         let tr = [combinedData[0].max - combinedData[0].min];
         for (let i = 1; i < combinedData.length; i++) {
@@ -257,6 +262,7 @@
             }
         }
 
+        // 提取最新指標
         const latestIdx = combinedData.length - 1;
         const latestEma = ema[latestIdx];
         const prevEma = ema[latestIdx - 1];
@@ -264,10 +270,12 @@
         const lowerBand = latestEma - (2.0 * latestAtr);
         const prevClose = combinedData[latestIdx - 1].close;
 
+        // 更新畫面
         document.getElementById('val-close').innerText = currentPrice.toFixed(2);
         document.getElementById('val-lower').innerText = lowerBand.toFixed(2);
         document.getElementById('val-ema').innerText = latestEma.toFixed(2);
 
+        // 策略判定
         const actionContainer = document.getElementById('action-container');
         const statusTitle = document.getElementById('status-title');
         const statusDesc = document.getElementById('status-desc');
@@ -293,7 +301,7 @@
         document.getElementById('last-update').innerText = '資料更新時間：' + new Date().toLocaleTimeString('zh-TW');
     }
 
-    // 手動送出運算
+    // 按下「送出運算」的事件 (手動)
     function calculateWithManualPrice() {
         const inputPrice = parseFloat(document.getElementById('manual-price').value);
         if(!inputPrice) {
@@ -303,45 +311,31 @@
         runCoreLogic(inputPrice);
     }
 
-    // 自動向台灣證交所抓取報價
+    // 嘗試自動抓取的事件
     async function autoFetchAndCalculate() {
         document.getElementById('status-title').innerText = '嘗試自動連線中...';
-        document.getElementById('status-desc').innerText = '正在向臺灣證交所 (TWSE) 請求即時價格...';
+        document.getElementById('status-desc').innerText = '正在向 Yahoo 伺服器請求即時價格...';
         try {
-            // 加入時間戳記避免被瀏覽器快取
             const cacheBuster = new Date().getTime();
-            // 使用指定的證交所 API 網址
-            const twseUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=tse_0050.tw&_=${cacheBuster}`;
-            // 透過 AllOrigins 代理伺服器繞過 CORS 跨域限制
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(twseUrl)}`;
+            const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/0050.TW?interval=1m&range=1d&_=${cacheBuster}`;
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(yahooUrl)}`;
             
             const response = await fetch(proxyUrl);
             const json = await response.json();
             
-            // 解析證交所的 JSON 格式
-            if (json.rtcode === "0000" && json.msgArray && json.msgArray.length > 0) {
-                const info = json.msgArray[0];
-                let price = parseFloat(info.z); // 'z' 為最新一筆成交價
-                
-                // 防呆機制：若盤中該分鐘剛好無成交，改抓取「最佳買進價第一檔」
-                if (isNaN(price) || price === 0) {
-                    price = parseFloat(info.b.split('_')[0]);
-                }
-
-                if (price && !isNaN(price)) {
-                    document.getElementById('manual-price').value = price; 
-                    runCoreLogic(price);
-                    document.getElementById('last-update').innerText = '自動抓取成功時間：' + new Date().toLocaleTimeString('zh-TW');
-                } else {
-                    throw new Error("無效報價：無法從證交所解析出正確價格");
-                }
+            const price = json.chart.result[0].meta.regularMarketPrice;
+            if (price && !isNaN(price)) {
+                document.getElementById('manual-price').value = price; // 自動填入輸入框，讓使用者知道抓到了什麼價格
+                runCoreLogic(parseFloat(price));
+                document.getElementById('last-update').innerText = '自動抓取成功時間：' + new Date().toLocaleTimeString('zh-TW');
             } else {
-                throw new Error("證交所回傳格式錯誤或非交易時間");
+                throw new Error("無效報價");
             }
         } catch (e) {
             console.log("自動抓取失敗", e);
             document.getElementById('status-title').innerText = '❌ 自動抓取失敗';
-            document.getElementById('status-desc').innerText = 'TWSE連線受阻或非盤中時間！請直接查看看盤軟體，並在上方手動輸入價格。';
+            document.getElementById('status-desc').innerText = 'API連線受阻！請直接查看看盤軟體，並在上方手動輸入價格。';
+            // 讓手動輸入框稍微閃爍提示使用者
             const manualInput = document.getElementById('manual-price');
             manualInput.style.borderColor = 'red';
             setTimeout(() => manualInput.style.borderColor = '#cbd5e1', 1000);
