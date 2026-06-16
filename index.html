@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>0050 動能防禦系統 (TWSE 官方直連版)</title>
+    <style>
+        :root {
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+            --text-main: #333333;
+            --text-muted: #64748b;
+            --primary: #0f172a;
+            --risk-off: #dc2626; 
+            --risk-on: #16a34a;  
+            --warning: #d97706;
+            --highlight: #2563eb;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            line-height: 1.6;
+        }
+        .container { max-width: 800px; width: 100%; }
+        .header { text-align: center; margin-bottom: 20px; }
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .btn-auto {
+            display: block; width: 100%; padding: 18px;
+            background-color: var(--primary); color: white;
+            border: none; border-radius: 8px; font-size: 1.2em;
+            cursor: pointer; margin-bottom: 20px; font-weight: bold;
+            transition: background-color 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);
+        }
+        .btn-auto:hover { background-color: #334155; }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 25px;
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px dashed #cbd5e1;
+            align-items: center;
+            justify-content: center;
+        }
+        .input-row {
+            display: flex; gap: 10px; justify-content: center; width: 100%;
+        }
+        .input-group input {
+            padding: 12px;
+            font-size: 1.2em;
+            border: 2px solid #cbd5e1;
+            border-radius: 6px;
+            width: 140px;
+            text-align: center;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        .input-group input:focus {
+            border-color: var(--highlight);
+            outline: none;
+        }
+        .btn-manual {
+            background-color: var(--highlight);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 1.1em;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.2s;
+        }
+        .btn-manual:hover { background-color: #1d4ed8; }
+
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .data-box {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+        .data-label { font-size: 0.85em; color: var(--text-muted); margin-bottom: 5px; font-weight: bold; }
+        .data-value { font-size: 1.5em; font-weight: bold; color: var(--primary); }
+        
+        .action-box {
+            text-align: center;
+            padding: 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2em;
+            transition: background-color 0.3s;
+        }
+        .status-loading { background-color: var(--text-muted); }
+        .status-risk-off { background-color: var(--risk-off); }
+        .status-risk-on { background-color: var(--risk-on); }
+        .status-warning { background-color: var(--warning); }
+        .action-desc { margin-top: 10px; font-size: 0.95em; opacity: 0.95; font-weight: normal; }
+        .timestamp { text-align: center; font-size: 0.85em; color: var(--text-muted); margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1 style="margin-bottom: 5px;">🛡️ 0050/00631L 動能防禦系統</h1>
+        <p style="color: var(--text-muted); font-size: 1em; margin-top: 0;">TWSE 臺灣證交所直連版 | 13:20 決策專用</p>
+    </div>
+
+    <div class="card">
+        <div style="text-align: center; margin-bottom: 15px; color: var(--highlight); font-weight: bold; font-size: 0.95em;">
+            ⏱️ 每日 13:20 優先點擊自動抓取，若無反應再使用手動備用方案
+        </div>
+
+        <button class="btn-auto" onclick="autoFetchAndCalculate()">
+            🔄 1. 向臺灣證交所(TWSE)自動抓取最新報價
+        </button>
+
+        <div class="input-group">
+            <label style="font-weight: bold; color: var(--text-muted); font-size: 0.9em; margin-bottom: 5px;">
+                ⚠️ 備用方案：若 API 被阻擋，請直接看券商 APP 填入報價
+            </label>
+            <div class="input-row">
+                <input type="number" id="manual-price" step="0.05" placeholder="例: 105.00">
+                <button class="btn-manual" onclick="calculateWithManualPrice()">2. 手動送出運算</button>
+            </div>
+        </div>
+
+        <div class="data-grid">
+            <div class="data-box">
+                <div class="data-label">運算基準價 (即時/手動)</div>
+                <div class="data-value" id="val-close" style="color: #0284c7;">--</div>
+            </div>
+            <div class="data-box">
+                <div class="data-label">防禦下軌 (Risk-Off)</div>
+                <div class="data-value" id="val-lower">--</div>
+            </div>
+            <div class="data-box">
+                <div class="data-label">攻擊中軌 (EMA 20)</div>
+                <div class="data-value" id="val-ema">--</div>
+            </div>
+            <div class="data-box">
+                <div class="data-label">歷史收盤價 (昨日)</div>
+                <div class="data-value" id="val-prev">--</div>
+            </div>
+        </div>
+
+        <div id="action-container" class="action-box status-loading">
+            <div id="status-title">系統就緒</div>
+            <div id="status-desc" class="action-desc">請點擊上方按鈕或輸入報價以獲取今日決策指令...</div>
+        </div>
+
+        <div class="timestamp" id="last-update">正在背景載入歷史指標...</div>
+    </div>
+</div>
+
+<script>
+    let globalHistoryData = null;
+
+    // 初始化背景載入歷史資料 (FinMind)
+    async function loadHistoryData() {
+        try {
+            let d = new Date();
+            d.setDate(d.getDate() - 90);
+            let startDateStr = d.toISOString().split('T')[0];
+            const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=0050&start_date=${startDateStr}`;
+            
+            const response = await fetch(url);
+            const rawData = await response.json();
+            if (rawData.status === 200 && rawData.data && rawData.data.length > 0) {
+                globalHistoryData = rawData.data;
+                document.getElementById('val-prev').innerText = globalHistoryData[globalHistoryData.length-1].close.toFixed(2);
+                document.getElementById('last-update').innerText = "✅ 歷史指標讀取完成，隨時可進行即時運算。";
+            }
+        } catch (e) {
+            console.error("歷史資料載入失敗", e);
+            document.getElementById('last-update').innerText = "❌ 歷史資料載入失敗，請檢查網路連線後重新整理網頁。";
+        }
+    }
+
+    // 核心運算引擎
+    function runCoreLogic(currentPrice) {
+        if (!globalHistoryData) {
+            alert("歷史資料尚未載入完成，請稍候重試。");
+            return;
+        }
+
+        if (isNaN(currentPrice) || currentPrice <= 0) {
+            alert("請輸入有效的價格數字！");
+            return;
+        }
+
+        const todayStr = new Date().toISOString().split('T')[0].replace(/-/g, '');
+        const lastHistoryDate = globalHistoryData[globalHistoryData.length - 1].date.replace(/-/g, '');
+        
+        let combinedData = [...globalHistoryData];
+        
+        if (lastHistoryDate !== todayStr) {
+            combinedData.push({
+                close: currentPrice,
+                max: Math.max(currentPrice, globalHistoryData[globalHistoryData.length-1].close),
+                min: Math.min(currentPrice, globalHistoryData[globalHistoryData.length-1].close),
+                date: new Date().toLocaleDateString('zh-TW')
+            });
+        } else {
+            combinedData[combinedData.length - 1].close = currentPrice;
+        }
+
+        const emaPeriod = 20;
+        const k = 2 / (emaPeriod + 1);
+        let ema = [combinedData[0].close];
+        for (let i = 1; i < combinedData.length; i++) {
+            ema.push(combinedData[i].close * k + ema[i-1] * (1 - k));
+        }
+
+        const atrPeriod = 14;
+        let tr = [combinedData[0].max - combinedData[0].min];
+        for (let i = 1; i < combinedData.length; i++) {
+            let hl = combinedData[i].max - combinedData[i].min;
+            let hc = Math.abs(combinedData[i].max - combinedData[i-1].close);
+            let lc = Math.abs(combinedData[i].min - combinedData[i-1].close);
+            tr.push(Math.max(hl, hc, lc));
+        }
+
+        let atr = [];
+        for (let i = 0; i < combinedData.length; i++) {
+            if (i < atrPeriod - 1) {
+                atr.push(null);
+            } else {
+                let sum = 0;
+                for (let j = 0; j < atrPeriod; j++) {
+                    sum += tr[i - j];
+                }
+                atr.push(sum / atrPeriod);
+            }
+        }
+
+        const latestIdx = combinedData.length - 1;
+        const latestEma = ema[latestIdx];
+        const prevEma = ema[latestIdx - 1];
+        const latestAtr = atr[latestIdx];
+        const lowerBand = latestEma - (2.0 * latestAtr);
+        const prevClose = combinedData[latestIdx - 1].close;
+
+        document.getElementById('val-close').innerText = currentPrice.toFixed(2);
+        document.getElementById('val-lower').innerText = lowerBand.toFixed(2);
+        document.getElementById('val-ema').innerText = latestEma.toFixed(2);
+
+        const actionContainer = document.getElementById('action-container');
+        const statusTitle = document.getElementById('status-title');
+        const statusDesc = document.getElementById('status-desc');
+
+        if (currentPrice < lowerBand) {
+            actionContainer.className = 'action-box status-risk-off';
+            statusTitle.innerText = '🚨 狀態二：防禦降檔 (Risk-Off)';
+            statusDesc.innerText = `以此價格 (${currentPrice}) 跌破下軌！若維持至 13:25，請執行清空 00631L 轉入 0050。`;
+        } else if (currentPrice >= latestEma && prevClose < prevEma) {
+            actionContainer.className = 'action-box status-risk-on';
+            statusTitle.innerText = '🚀 狀態三：趨勢重啟 (Risk-On)';
+            statusDesc.innerText = `以此價格 (${currentPrice}) 強勢站回中軌！若維持至 13:25，請執行清空 0050 換回 00631L。`;
+        } else if (currentPrice >= latestEma) {
+            actionContainer.className = 'action-box status-risk-on';
+            statusTitle.innerText = '🟢 狀態一：平靜多頭';
+            statusDesc.innerText = '以此價格判定，盤勢安全。繼續 100% 抱緊 00631L。';
+        } else {
+            actionContainer.className = 'action-box status-warning';
+            statusTitle.innerText = '⚠️ 狀態：空頭過渡期 (等待訊號)';
+            statusDesc.innerText = '以此價格判定，處於中軌與下軌之間。請維持現狀，繼續持有 0050 防禦部位。';
+        }
+
+        document.getElementById('last-update').innerText = '資料更新時間：' + new Date().toLocaleTimeString('zh-TW');
+    }
+
+    // 手動送出運算
+    function calculateWithManualPrice() {
+        const inputPrice = parseFloat(document.getElementById('manual-price').value);
+        if(!inputPrice) {
+            alert("請先在上方輸入 0050 目前的即時報價！");
+            return;
+        }
+        runCoreLogic(inputPrice);
+    }
+
+    // 自動向台灣證交所抓取報價
+    async function autoFetchAndCalculate() {
+        document.getElementById('status-title').innerText = '嘗試自動連線中...';
+        document.getElementById('status-desc').innerText = '正在向臺灣證交所 (TWSE) 請求即時價格...';
+        try {
+            // 加入時間戳記避免被瀏覽器快取
+            const cacheBuster = new Date().getTime();
+            // 使用指定的證交所 API 網址
+            const twseUrl = `https://mis.twse.com.tw/stock/api/getStockInfo.jsp?json=1&delay=0&ex_ch=tse_0050.tw&_=${cacheBuster}`;
+            // 透過 AllOrigins 代理伺服器繞過 CORS 跨域限制
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(twseUrl)}`;
+            
+            const response = await fetch(proxyUrl);
+            const json = await response.json();
+            
+            // 解析證交所的 JSON 格式
+            if (json.rtcode === "0000" && json.msgArray && json.msgArray.length > 0) {
+                const info = json.msgArray[0];
+                let price = parseFloat(info.z); // 'z' 為最新一筆成交價
+                
+                // 防呆機制：若盤中該分鐘剛好無成交，改抓取「最佳買進價第一檔」
+                if (isNaN(price) || price === 0) {
+                    price = parseFloat(info.b.split('_')[0]);
+                }
+
+                if (price && !isNaN(price)) {
+                    document.getElementById('manual-price').value = price; 
+                    runCoreLogic(price);
+                    document.getElementById('last-update').innerText = '自動抓取成功時間：' + new Date().toLocaleTimeString('zh-TW');
+                } else {
+                    throw new Error("無效報價：無法從證交所解析出正確價格");
+                }
+            } else {
+                throw new Error("證交所回傳格式錯誤或非交易時間");
+            }
+        } catch (e) {
+            console.log("自動抓取失敗", e);
+            document.getElementById('status-title').innerText = '❌ 自動抓取失敗';
+            document.getElementById('status-desc').innerText = 'TWSE連線受阻或非盤中時間！請直接查看看盤軟體，並在上方手動輸入價格。';
+            const manualInput = document.getElementById('manual-price');
+            manualInput.style.borderColor = 'red';
+            setTimeout(() => manualInput.style.borderColor = '#cbd5e1', 1000);
+        }
+    }
+
+    // 網頁載入時啟動背景資料讀取
+    window.onload = loadHistoryData;
+</script>
+
+</body>
+</html>
